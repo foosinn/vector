@@ -1,4 +1,4 @@
-use crate::{event::Event, sinks, sources, transforms};
+use crate::{conditions, event::Event, sinks, sources, transforms};
 use component::ComponentDescription;
 use futures::sync::mpsc;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
@@ -8,7 +8,6 @@ use std::fs::DirBuilder;
 use std::{collections::HashMap, path::PathBuf};
 
 pub mod component;
-mod unit_test;
 mod validation;
 mod vars;
 
@@ -24,7 +23,7 @@ pub struct Config {
     #[serde(default)]
     pub transforms: IndexMap<String, TransformOuter>,
     #[serde(default)]
-    pub tests: Vec<unit_test::TestDefinition>,
+    pub tests: Vec<TestDefinition>,
 }
 
 #[derive(Default, Debug, Deserialize, Serialize)]
@@ -176,6 +175,41 @@ pub trait TransformConfig: core::fmt::Debug {
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestDefinition {
+    pub name: String,
+    pub input: TestInput,
+    pub outputs: Vec<TestOutput>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestInput {
+    pub insert_at: String,
+    #[serde(default = "default_test_input_type", rename = "type")]
+    pub type_str: String,
+    pub value: Option<String>,
+}
+
+fn default_test_input_type() -> String {
+    "raw".to_string()
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct TestOutput {
+    pub extract_from: String,
+    pub conditions: IndexMap<String, TestCondition>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum TestCondition {
+    String(String),
+    Embedded(Box<dyn conditions::ConditionConfig>),
+}
 
 // Helper methods for programming construction during tests
 impl Config {

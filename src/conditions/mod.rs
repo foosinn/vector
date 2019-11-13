@@ -14,7 +14,7 @@ pub trait Condition: Send + Sync {
     /// aggregate any children when applicable.
     fn init(&mut self, siblings: &IndexMap<String, Arc<dyn Condition>>) -> crate::Result<()>;
 
-    fn check(&self, e: &Event) -> bool;
+    fn check(&self, e: &Event) -> bool; // TODO: Add method that provides fail context? -> Result<(), String>
 }
 
 #[typetag::serde(tag = "type")]
