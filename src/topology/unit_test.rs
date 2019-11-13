@@ -1,7 +1,12 @@
 use crate::{
-    conditions::Condition, event::Event, topology::config::TestDefinition, transforms::Transform,
+    conditions::Condition,
+    event::Event,
+    topology::config::{TestCondition, TestDefinition},
+    transforms::Transform,
 };
 use std::collections::HashMap;
+
+//------------------------------------------------------------------------------
 
 pub struct UnitTestCheck {
     extract_from: String,
@@ -19,6 +24,17 @@ pub struct UnitTest {
     transforms: HashMap<String, UnitTestTransform>,
     checks: Vec<UnitTestCheck>,
 }
+
+//------------------------------------------------------------------------------
+
+impl UnitTest {
+    pub fn run(&self) -> Result<(), Vec<String>> {
+        // TODO
+        Ok(())
+    }
+}
+
+//------------------------------------------------------------------------------
 
 fn build_unit_test(
     definition: &TestDefinition,
@@ -121,6 +137,35 @@ fn build_unit_test(
         }
     };
 
+    let checks = definition.outputs.iter().map(|o| {
+        let mut conditions: HashMap<String, Box<dyn Condition>> = HashMap::new();
+        for (k, cond_conf) in &o.conditions {
+            match cond_conf {
+                TestCondition::Embedded(b) => {
+                    match b.build() {
+                        Ok(c) => {
+                            // TODO c.init(foo)
+                            conditions.insert(k.clone(), c);
+                        },
+                        Err(e) => {
+                            errors.push(format!(
+                                "failed to create test condition '{}': {}",
+                                k, e,
+                            ));
+                        },
+                    }
+                },
+                TestCondition::String(_s) => {
+                    errors.push(format!("failed to create test condition '{}': string conditions are not yet supported", k));
+                },
+            }
+        }
+        UnitTestCheck{
+            extract_from: o.extract_from.clone(),
+            conditions: conditions,
+        }
+    }).collect();
+
     if !errors.is_empty() {
         Err(errors)
     } else {
@@ -128,7 +173,7 @@ fn build_unit_test(
             name: definition.name.clone(),
             input: (definition.input.insert_at.clone(), input_event),
             transforms: HashMap::new(), // TODO HashMap<String, UnitTestTransform>,
-            checks: Vec::new(),         // TODO Vec<UnitTestCheck>,
+            checks: checks,
         })
     }
 }
