@@ -32,6 +32,14 @@ fn build_unit_test(
         .map(|(k, _)| (k.clone(), ()))
         .collect();
 
+    if !inputs.contains_key(&definition.input.insert_at) {
+        errors.push(format!(
+            "unable to locate test target '{}'",
+            definition.input.insert_at,
+        ));
+        return Err(errors);
+    }
+
     let mut prev_inputs_len = inputs.len();
 
     let mut transforms: Vec<(String, Vec<String>, Box<dyn Transform>)> = config
@@ -41,7 +49,7 @@ fn build_unit_test(
             let transform_inputs: Vec<String> = t
                 .inputs
                 .iter()
-                .map(|i| i.clone())
+                .cloned()
                 .filter(|i| inputs.contains_key(i))
                 .collect();
 
@@ -66,10 +74,63 @@ fn build_unit_test(
 
     // Keep reducing our transforms until we have the smallest possible set.
     while prev_inputs_len > inputs.len() {
-        prev_inputs_len = inputs.len(); // TODO
+        prev_inputs_len = inputs.len();
+
+        transforms = transforms
+            .into_iter()
+            .filter_map(|(k, t_inputs, transform)| {
+                let transform_inputs: Vec<String> = t_inputs
+                    .into_iter()
+                    .filter(|i| inputs.contains_key(i))
+                    .collect();
+
+                if transform_inputs.len() == 0 && k != definition.input.insert_at {
+                    inputs.remove(&k);
+                    return None;
+                }
+
+                Some((k.clone(), transform_inputs, transform))
+            })
+            .collect();
     }
 
-    Err(errors)
+    definition.outputs.iter().for_each(|o| {
+        if !inputs.contains_key(&o.extract_from) {
+            errors.push(format!(
+                "unable to complete topology between input target '{}' and '{}'",
+                definition.input.insert_at, o.extract_from
+            ));
+        }
+    });
+
+    // TODO: Support different input event types.
+    let input_event = match definition.input.type_str.as_ref() {
+        "raw" => match definition.input.value.as_ref() {
+            Some(v) => Event::from(v.clone()),
+            None => {
+                errors.push(format!("input type 'raw' requires the field 'value'"));
+                Event::from("")
+            }
+        },
+        _ => {
+            errors.push(format!(
+                "unrecognized input type '{}', expected one of: 'raw'",
+                definition.input.type_str
+            ));
+            Event::from("")
+        }
+    };
+
+    if !errors.is_empty() {
+        Err(errors)
+    } else {
+        Ok(UnitTest {
+            name: definition.name.clone(),
+            input: (definition.input.insert_at.clone(), input_event),
+            transforms: HashMap::new(), // TODO HashMap<String, UnitTestTransform>,
+            checks: Vec::new(),         // TODO Vec<UnitTestCheck>,
+        })
+    }
 }
 
 pub fn build_unit_tests(config: &super::Config) -> Result<Vec<UnitTest>, Vec<String>> {
