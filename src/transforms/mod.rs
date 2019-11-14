@@ -4,6 +4,7 @@ use snafu::Snafu;
 pub mod add_fields;
 pub mod add_tags;
 pub mod coercer;
+pub mod concat;
 pub mod field_filter;
 pub mod grok_parser;
 pub mod json_parser;

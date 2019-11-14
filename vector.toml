@@ -1,0 +1,22 @@
+data_dir = "/tmp/vector"
+
+[sources.in]
+  type = "stdin"
+
+[transforms.test]
+  inputs = ["in"]
+  type = "concat"
+
+  target = "test"
+  joiner = " "
+  items = ["message", "host[..]"]
+
+[transforms.test2]
+  inputs = ["test"]
+  type = "regex_parser"
+  regex = "("
+
+[sinks.out]
+  inputs   = ["test2"]
+  type     = "console"
+  encoding = "text"
