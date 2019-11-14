@@ -9,7 +9,7 @@ data_dir = "/tmp/vector"
 
   target = "test"
   joiner = " "
-  items = ["message", "host[.]"]
+  items = ["message", "host[1..5]"]
 
 [sinks.out]
   inputs   = ["test"]

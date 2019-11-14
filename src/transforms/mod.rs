@@ -33,5 +33,5 @@ enum BuildError {
     InvalidRegex { source: regex::Error },
 
     #[snafu(display("Invalid substring expression: {}", name))]
-    InvalidSubstring { name: String }
+    InvalidSubstring { name: String },
 }
