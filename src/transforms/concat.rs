@@ -1,9 +1,10 @@
-use super::Transform;
+use super::{BuildError, Transform};
 use crate::{
 	event::{Event, ValueKind},
 	topology::config::{DataType, TransformConfig, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
+use std::iter::Peekable;
 use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -25,7 +26,7 @@ impl TransformConfig for ConcatConfig {
 			.items
 			.iter()
 			.map(|item| Substring::new(item))
-			.collect::<Result<Vec<Substring>, &'static str>>()?;
+			.collect::<Result<Vec<Substring>, BuildError>>()?;
 		Ok(Box::new(Concat::new(
 			self.target.clone(),
 			self.joiner.clone(),
@@ -49,15 +50,15 @@ impl TransformConfig for ConcatConfig {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Substring {
 	source: Atom,
-	start: Option<u8>,
-	end: Option<u8>,
+	start: Option<usize>,
+	end: Option<usize>,
 }
 
 impl Substring {
-	pub fn new(input: &Atom) -> Result<Substring, &'static str> {
+	fn new(input: &Atom) -> Result<Substring, BuildError> {
 		let mut source = String::from("");
-		let mut start: Option<u8> = None;
-		let mut end: Option<u8> = None;
+		let mut start: Option<usize> = None;
+		let mut end: Option<usize> = None;
 		let mut buffer = String::from("");
 		let mut it = input.chars().peekable();
 		while let Some(&c) = it.peek() {
@@ -69,27 +70,28 @@ impl Substring {
 					while let Some(&c) = it.peek() {
 						match c {
 							'.' => {
-								start = match buffer.parse() {
-									Ok(val) => Some(val),
+								start = match buffer.parse::<u8>() {
+									Ok(val) => Some(val as usize),
 									Err(_) => None,
 								};
 								buffer = String::from("");
 								it.next();
-								assert!(
-									'.' == *(it
-										.peek()
-										.unwrap()),
-									"invalid format, use [start..end]"
-								);
+								if *(it.peek().unwrap()) != '.' {
+									return Err(
+									BuildError::InvalidSubstring{
+									    name: "invalid format, use source[start..end]".to_string()
+									}
+								    );
+								}
 								it.next();
 							}
-							'0'...'9' => {
+							'0'..='9' => {
 								buffer.push(c);
 								it.next();
 							}
 							']' => {
-								end = match buffer.parse() {
-									Ok(val) => Some(val),
+								end = match buffer.parse::<u8>() {
+									Ok(val) => Some(val as usize),
 									Err(_) => None,
 								};
 								return Ok(Self {
@@ -98,9 +100,7 @@ impl Substring {
 									end: end,
 								});
 							}
-							_ => return Err(
-								"invalid format, missing ']'",
-							),
+						    _ => return Err(BuildError::InvalidSubstring{name: "invalid format, missing ']'".to_string()}),
 						}
 					}
 				}
@@ -117,7 +117,9 @@ impl Substring {
 				end: None,
 			});
 		}
-		Err("invalid format")
+		Err(BuildError::InvalidSubstring {
+			name: "invalid format, use source[start..end]".to_string(),
+		})
 	}
 }
 

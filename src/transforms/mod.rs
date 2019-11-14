@@ -31,4 +31,7 @@ pub trait Transform: Send {
 enum BuildError {
     #[snafu(display("Invalid regular expression: {}", source))]
     InvalidRegex { source: regex::Error },
+
+    #[snafu(display("Invalid substring expression: {}", name))]
+    InvalidSubstring { name: String }
 }

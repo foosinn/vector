@@ -9,14 +9,9 @@ data_dir = "/tmp/vector"
 
   target = "test"
   joiner = " "
-  items = ["message", "host[..]"]
-
-[transforms.test2]
-  inputs = ["test"]
-  type = "regex_parser"
-  regex = "("
+  items = ["message", "host[.]"]
 
 [sinks.out]
-  inputs   = ["test2"]
+  inputs   = ["test"]
   type     = "console"
   encoding = "text"
